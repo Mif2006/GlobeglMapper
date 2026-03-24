@@ -1,32 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Globe from 'react-globe.gl';
 
-const IranGlobe = () => {
+const CountryGlobe = ({ activeCountry }) => {
   const globeEl = useRef();
-  const [countries, setCountries] = useState([]);
-  
-  // Coordinates for Central Iran
-  const IRAN_CENTER = { lat: 32.4279, lng: 53.6880, label: 'Iran' };
+  const [allCountries, setAllCountries] = useState([]);
+  const [highlightedBorder, setHighlightedBorder] = useState([]);
 
+  // 1. Fetch the entire world map ONCE when component loads
   useEffect(() => {
-    // 1. Fetch valid GeoJSON border data (Fixed URL)
     fetch('https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson')
       .then(res => res.json())
       .then(data => {
-        // 2. Filter data to ONLY include Iran (ISO code: IRN)
-        const iranBorder = data.features.filter(d => d.properties.ISO_A3 === 'IRN');
-        setCountries(iranBorder);
+        setAllCountries(data.features);
       })
       .catch(err => console.error("Error fetching GeoJSON:", err));
-
-    // 3. Smoothly fly to Iran on load
-    setTimeout(() => {
-      // Safety check: ensure globeEl exists before calling methods
-      if (globeEl.current) {
-        globeEl.current.pointOfView({ lat: 32, lng: 53, altitude: 1.8 }, 3000);
-      }
-    }, 1000);
   }, []);
+
+  // 2. React to changes in the activeCountry prop
+  useEffect(() => {
+    // Filter the border data
+    if (allCountries.length > 0) {
+      const border = allCountries.filter(d => d.properties.ISO_A3 === activeCountry.code);
+      setHighlightedBorder(border);
+    }
+
+    // Animate the camera
+    if (globeEl.current) {
+      globeEl.current.pointOfView({ 
+        lat: activeCountry.lat, 
+        lng: activeCountry.lng, 
+        altitude: 1.5 // Zoomed in a bit closer!
+      }, 2000); // 2000ms (2 seconds) smooth flight
+    }
+  }, [activeCountry, allCountries]);
 
   return (
     <Globe
@@ -35,19 +41,19 @@ const IranGlobe = () => {
       backgroundImageUrl="//cdn.jsdelivr.net/npm/three-globe/example/img/night-sky.png"
       
       // DRAW BORDERS
-      polygonsData={countries}
-      polygonCapColor={() => 'rgba(34, 197, 94, 0.4)'} // Transparent Green
-      polygonSideColor={() => 'rgba(255, 255, 255, 0.1)'} // Thin white edge
+      polygonsData={highlightedBorder}
+      polygonCapColor={() => 'rgba(34, 197, 94, 0.4)'} 
+      polygonSideColor={() => 'rgba(255, 255, 255, 0.1)'} 
       polygonStrokeColor={() => '#ffffff'}
       
       // ADD FLAG/MARKER
-      htmlElementsData={[IRAN_CENTER]}
+      htmlElementsData={[activeCountry]}
       htmlElement={d => {
         const el = document.createElement('div');
         el.innerHTML = `
-          <div style="text-align: center; pointer-events: none;">
-            <img src="https://flagcdn.com/w40/ir.png" style="width: 30px; border: 1px solid rgba(255,255,255,0.5); border-radius: 2px;" alt="Flag" />
-            <div style="color: white; font-family: sans-serif; font-size: 11px; margin-top: 4px; text-shadow: 1px 1px 2px black;">${d.label}</div>
+          <div style="text-align: center; pointer-events: none; transition: all 0.3s ease;">
+            <img src="https://flagcdn.com/w40/${d.flag}.png" style="width: 36px; border: 2px solid rgba(255,255,255,0.8); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.5);" alt="Flag" />
+            <div style="color: white; font-family: sans-serif; font-size: 13px; font-weight: bold; margin-top: 6px; text-shadow: 1px 1px 4px black, 0 0 10px rgba(34,197,94,0.8);">${d.label}</div>
           </div>
         `;
         return el;
@@ -56,4 +62,4 @@ const IranGlobe = () => {
   );
 };
 
-export default IranGlobe;
+export default CountryGlobe;
